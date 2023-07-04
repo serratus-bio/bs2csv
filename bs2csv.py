@@ -2,7 +2,7 @@ import xml.sax
 import xmltodict
 import argparse
 import csv
-import boto3
+import requests
 
 class BioSamplesParser(xml.sax.ContentHandler):
     '''
@@ -140,8 +140,7 @@ class BioSamplesParser(xml.sax.ContentHandler):
     def endDocument(self):
         pass
 
-s3 = boto3.resource('s3', region_name='us-east-1')
-bucket  = s3.Bucket('serratus-biosamples')
+
 
 arg_parser = argparse.ArgumentParser(description="""Read in a list of biosample ids and output a csv file with the biosample metadata. Metadata is extracted from biosamples xml files from NCBI.
 
@@ -163,7 +162,16 @@ with open(input_file, 'r') as f:
         # content_dict contains the metadata for a single biosample id
         content_dict = {}
         handler = BioSamplesParser(content_dict)
-        result_string = bucket.Object(key='biosamples_split/' + accession + '.xml').get()['Body'].read().decode('utf-8')
+        # result_string = bucket.Object(key='biosamples_split/' + accession + '.xml').get()['Body'].read().decode('utf-8')
+        url = 'https://serratus-biosamples.s3.us-east-1.amazonaws.com/biosamples_split/' + accession + '.xml'
+        headers = {'Host': 'serratus-biosamples.s3.amazonaws.com'}
+
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            print('Error: status code {} for {}'.format(response.status_code, accession))
+            continue
+        result_string = response.text
+
         xml.sax.parseString(result_string, handler)
         results_dict[accession] = content_dict
 
