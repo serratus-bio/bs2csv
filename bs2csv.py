@@ -126,6 +126,8 @@ class BioSamplesParser(xml.sax.ContentHandler):
     def endElement(self, name):
         if name == 'Owner':
             self.owner_xml_string += '</Owner>'
+            # replace ampersand with 'and' to avoid xml parsing error
+            self.owner_xml_string = self.owner_xml_string.replace('&', 'and')
             owner_dict = self.unpack_owner_dict(xml_dict=xmltodict.parse(self.owner_xml_string))
             for k, v in owner_dict:
                 self.cur_dict[k[7:]] = v
@@ -172,7 +174,11 @@ with open(input_file, 'r') as f:
             continue
         result_string = response.text
 
-        xml.sax.parseString(result_string, handler)
+        try:
+            xml.sax.parseString(result_string, handler)
+        except xml.sax.SAXParseException:
+            print('Error: SAXParseException for {}'.format(accession))
+            continue
         results_dict[accession] = content_dict
 
 csv_headers = ['biosample_id']
