@@ -147,7 +147,7 @@ class BioSamplesParser(xml.sax.ContentHandler):
 arg_parser = argparse.ArgumentParser(description="""Read in a list of biosample ids and output a csv file with the biosample metadata. Metadata is extracted from biosamples xml files from NCBI.
 
 Example usage:
-    python biosamples_parser.py biosample_ids.txt -o metadata.csv
+    python bs2csv.py biosample_ids.txt -o metadata.csv
     """, formatter_class=argparse.RawTextHelpFormatter)
 arg_parser.add_argument('input_file', help='Input text file with a different biosample id on each line')
 arg_parser.add_argument('-o', help='Name for output csv file with biosample metadata. Defaults to "biosample_metadata.csv"', default='biosample_metadata.csv', dest='output_file', metavar='output_file.csv')
@@ -164,23 +164,24 @@ with open(input_file, 'r') as f:
         # content_dict contains the metadata for a single biosample id
         content_dict = {}
         handler = BioSamplesParser(content_dict)
-        # result_string = bucket.Object(key='biosamples_split/' + accession + '.xml').get()['Body'].read().decode('utf-8')
         url = 'https://serratus-biosamples.s3.us-east-1.amazonaws.com/biosamples_split/' + accession + '.xml'
         headers = {'Host': 'serratus-biosamples.s3.amazonaws.com'}
-
+        # get the xml file from the serratous-biosamples s3 bucket
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
             print('Error: status code {} for {}'.format(response.status_code, accession))
             continue
         result_string = response.text
-
+        # parse the response stirng with xml.sax
         try:
             xml.sax.parseString(result_string, handler)
         except xml.sax.SAXParseException:
             print('Error: SAXParseException for {}'.format(accession))
             continue
+        # store the metadata for the biosample id in results_dict
         results_dict[accession] = content_dict
 
+# ensure that all headers are stored in csv_headers
 csv_headers = ['biosample_id']
 for _, data_dict in results_dict.items():
     for header, _ in data_dict.items():
@@ -188,7 +189,7 @@ for _, data_dict in results_dict.items():
             csv_headers.append(header)
 
 # write results to csv file
-with open(output_file, 'w') as f:
+with open(output_file, 'w', encoding='utf-8') as f:
     writer = csv.writer(f)
     writer.writerow(csv_headers)
     for accession, data_dict in results_dict.items():
