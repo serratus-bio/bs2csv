@@ -171,7 +171,7 @@ with open(input_file, 'r') as f:
         if response.status_code != 200:
             print('Error: status code {} for {}'.format(response.status_code, accession))
             continue
-        result_string = response.text
+        result_string = response.content.decode('utf-8')
         # parse the response stirng with xml.sax
         try:
             xml.sax.parseString(result_string, handler)
