@@ -144,17 +144,29 @@ class BioSamplesParser(xml.sax.ContentHandler):
 
 
 
-arg_parser = argparse.ArgumentParser(description="""Read in a list of biosample ids and output a csv file with the biosample metadata. Metadata is extracted from biosamples xml files from NCBI.
+arg_parser = argparse.ArgumentParser(description="""Read in a list of biosample ids and output a csv file with the biosample metadata. Metadata is extracted from biosamples xml files from NCBI. Can optionally read in a txt file of values to extract from the xml files. If no file is provided, all values will be extracted.
 
 Example usage:
-    python bs2csv.py biosample_ids.txt -o metadata.csv
+    python bs2csv.py biosample_ids.txt -o metadata.csv -v values.txt
     """, formatter_class=argparse.RawTextHelpFormatter)
 arg_parser.add_argument('input_file', help='Input text file with a different biosample id on each line')
 arg_parser.add_argument('-o', help='Name for output csv file with biosample metadata. Defaults to "biosample_metadata.csv"', default='biosample_metadata.csv', dest='output_file', metavar='output_file.csv')
+arg_parser.add_argument('-v', help='Input text file with a different value on each line. Only these values will be extracted from the xml files. Defaults to extracting all values.', default=None, dest='values_file', metavar='values.txt')
 
 args = arg_parser.parse_args()
 input_file = args.input_file
 output_file = args.output_file
+values_file = args.values_file
+
+# extract the values from the values file if provided
+csv_headers = ['biosample_id']
+set_values = False
+if values_file:
+    set_values = True
+    with open(values_file, 'r') as f:
+        values = f.read().splitlines()
+        csv_headers.extend(values)
+
 
 with open(input_file, 'r') as f:
     # results_dict contains a dictionary for each biosample id with the metadata
@@ -179,14 +191,19 @@ with open(input_file, 'r') as f:
             print('Error: SAXParseException for {}'.format(accession))
             continue
         # store the metadata for the biosample id in results_dict
-        results_dict[accession] = content_dict
+        # filter the content_dict to only include the values in values_file if provided
+        if set_values:
+            filtered_dict = {k: content_dict[k] for k in content_dict if k in values}
+            results_dict[accession] = filtered_dict
+        else:
+            results_dict[accession] = content_dict
 
-# ensure that all headers are stored in csv_headers
-csv_headers = ['biosample_id']
-for _, data_dict in results_dict.items():
-    for header, _ in data_dict.items():
-        if header not in csv_headers:
-            csv_headers.append(header)
+# add headers to the csv_headers if there is no values file
+if csv_headers == ['biosample_id']:
+    for _, data_dict in results_dict.items():
+        for header, _ in data_dict.items():
+            if header not in csv_headers:
+                csv_headers.append(header)
 
 # write results to csv file
 with open(output_file, 'w', encoding='utf-8') as f:
